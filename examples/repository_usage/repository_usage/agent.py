@@ -2,18 +2,18 @@ import mesa
 
 class LearningObjectAgent(mesa.Agent):
     """An learning object agent that takes action in repository."""
-    def __init__(self, unique_id, model):
+    def __init__(self, unique_id, onMainPage, model):
         super().__init__(unique_id, model)    
         self.views = 0
         self.downloads = 0
         self.rates = 0
         self.likes = 0
+        self.isOnMainPage = onMainPage
+        self.text = ""
 
     def step(self):
-        # The agent's step will go here.
-        # For demonstration purposes we will print the agent's unique_id
-        print("Hi, I am agent " + str(self.unique_id) + ". V:" + str(self.views) + " D:" + str(self.downloads) +
-        " R:" + str(self.rates) + " L:" + str(self.likes))
+        self.text = "ID: " + str(self.unique_id) + ". V:" + str(self.views) 
+        self.text += " D:" + str(self.downloads) + " R:" + str(self.rates) + " L:" + str(self.likes)
 
 class UserAgent(mesa.Agent):
     """An user agent that takes action in repository."""

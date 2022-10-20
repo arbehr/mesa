@@ -32,15 +32,57 @@ def agent_portrayal(agent):
             color = LIKE_COLOR
         elif agent.action == 3:
             color = RATE_COLOR
-
         portrayal["Color"] = color
+    elif type(agent) is LearningObjectAgent:
+        if agent.isOnMainPage:
+            portrayal["Color"] = ["#84e184", "#adebad", "#d6f5d6"]
+            portrayal["Shape"] = "rect"
+            portrayal["Filled"] = "true"
+        portrayal["Layer"] = 0
+        portrayal["w"] = 1
+        portrayal["h"] = 1
+        portrayal["Text"] = agent.text
     return portrayal
 
 # dictionary of user settable parameters - these map to the model __init__ parameters
 model_params = {
+    "sec_users": mesa.visualization.StaticText("Users Parameters:"),
     "init_users": mesa.visualization.Slider(
-        "Users", 2, 1, 200, description="Initial Number of Users"
+        "Amount of users", 2, 1, 200, description="Initial Number of Users"
     ),
+    "view_chance": mesa.visualization.Slider(
+        "View Chance",
+        0.6,
+        0.0,
+        1.0,
+        0.1,
+        description="Probability that a learning object will be viewed",
+    ),
+    "download_chance": mesa.visualization.Slider(
+        "Download Chance",
+        0.4,
+        0.0,
+        1.0,
+        0.1,
+        description="Probability that a learning object will be downloaded",
+    ),
+    "rate_chance": mesa.visualization.Slider(
+        "Rate Chance",
+        0.15,
+        0.0,
+        1.0,
+        0.1,
+        description="Probability that a learning object will be rated",
+    ),
+    "like_chance": mesa.visualization.Slider(
+        "Like Chance",
+        0.2,
+        0.0,
+        1.0,
+        0.1,
+        description="Probability that a learning object will be liked",
+    ),
+    "sec_rank": mesa.visualization.StaticText("Ranking Parameters:"),
     "view_weight": mesa.visualization.Slider(
         "View weight",
         2,

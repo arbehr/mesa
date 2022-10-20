@@ -33,7 +33,9 @@ class RepositoryUsageModel(mesa.Model):
         Each grid cell represent one learning object in the repository. 
         The agent color represent the action performed: download, view, rate, or like."""
 
-    def __init__(self, init_users, view_weight, download_weight, rate_weight, like_weight, width=5, height=2):
+    def __init__(self, init_users, view_weight=2, download_weight=4, rate_weight=8, like_weight=7, 
+        view_chance=0.6, download_chance=0.4, rate_chance=0.15, like_chance=0.2,
+        max_steps=30, h_size=10, v_size=10, width=5, height=2):
         self.running = True
         self.num_agents = init_users
         self.grid = mesa.space.MultiGrid(width, height, True)
@@ -42,7 +44,7 @@ class RepositoryUsageModel(mesa.Model):
         id = 0
         for i in range(self.grid.width):
             for j in range(self.grid.height):
-                a = LearningObjectAgent(id, self)
+                a = LearningObjectAgent(id, id < 5, self)
                 id += 1
                 self.grid.place_agent(a, (i, j))
                 self.schedule.add(a)
