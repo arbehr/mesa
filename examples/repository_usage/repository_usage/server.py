@@ -46,6 +46,28 @@ def agent_portrayal(agent):
 
 # dictionary of user settable parameters - these map to the model __init__ parameters
 model_params = {
+    "sec_repository": mesa.visualization.StaticText("Repository Parameters:"),
+    "max_steps": mesa.visualization.Slider(
+        "Lifecycle (max steps)",
+        30,
+        1,
+        500,
+        description="Like weight to be used to rank",
+    ),
+    "h_size": mesa.visualization.Slider(
+        "Horizontal amount of learning objects",
+        10,
+        1,
+        100,
+        description="Horizontal size of learning objects",
+    ),
+    "v_size": mesa.visualization.Slider(
+        "Vertical amount of learning objects",
+        10,
+        1,
+        100,
+        description="Vertical size of learning objects",
+    ),
     "sec_users": mesa.visualization.StaticText("Users Parameters:"),
     "init_users": mesa.visualization.Slider(
         "Amount of users", 2, 1, 200, description="Initial Number of Users"
@@ -113,7 +135,7 @@ model_params = {
     ),
 }
 
-grid = mesa.visualization.CanvasGrid(agent_portrayal, 5, 5, 500, 500)
+grid = mesa.visualization.CanvasGrid(agent_portrayal, 10, 10, 500, 500)
 
 # map data to chart in the ChartModule
 line_chart = mesa.visualization.ChartModule(
