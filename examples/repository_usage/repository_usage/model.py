@@ -35,11 +35,18 @@ class RepositoryUsageModel(mesa.Model):
 
     def __init__(self, init_users, view_weight=2, download_weight=4, rate_weight=8, like_weight=7, 
         view_chance=0.6, download_chance=0.4, rate_chance=0.15, like_chance=0.2,
-        max_steps=30, h_size=10, v_size=10, width=5, height=2):
+        max_steps=30, h_size=10, v_size=10, width=5, height=2, mainPageWidth=5):
         self.running = True
         self.num_agents = init_users
         self.grid = mesa.space.MultiGrid(width, height, True)
         self.schedule = mesa.time.RandomActivation(self)
+        self.max_steps = max_steps
+        self.mainPage = " "
+        self.view_chance = view_chance
+        self.download_chance = download_chance
+        self.like_chance = like_chance
+        self.rate_chance = rate_chance
+
         # Create learning object agents, one in each cell, static
         id = 0
         for i in range(self.grid.width):
@@ -48,7 +55,14 @@ class RepositoryUsageModel(mesa.Model):
                 id += 1
                 self.grid.place_agent(a, (i, j))
                 self.schedule.add(a)
-        
+        # Get five random agents to put on main page
+        pickedIds = 0
+        while pickedIds < mainPageWidth:
+            random_id = self.random.randrange(id)
+            if((" " + str(random_id) + " ") not in self.mainPage):
+                pickedIds += 1
+                self.mainPage += str(random_id) + " "
+                
         # Create user agents
         for i in range(self.num_agents):
             a = UserAgent(id, self)
@@ -76,6 +90,8 @@ class RepositoryUsageModel(mesa.Model):
         self.datacollector.collect(self)
         # tell all the agents in the model to run their step function
         self.schedule.step()
+        if(self.schedule.steps == self.max_steps):
+            self.running = False
 
     def run_model(self):
         for i in range(self.run_time):

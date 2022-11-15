@@ -2,14 +2,26 @@ from repository_usage.model import *
 import mesa
 
 # The colors here are taken from Matplotlib's tab10 palette
-# Green, color_code = 0
+# Gray, action_code = 0
+NONE_COLOR = "#868786"
+# Green, action_code = 1
 VIEW_COLOR = "#2ca02c"
-# Red, color_code = 1
+# Red, action_code = 2
 DOWNLOAD_COLOR = "#d62728"
-# Blue, color_code = 2
+# Blue, action_code = 3
 LIKE_COLOR = "#1f77b4"
-# Gold, color_code = 3
+# Gold, action_code = 4
 RATE_COLOR = "#b4991f"
+
+NUMBER_OF_CELLS = 10
+SIZE_OF_CANVAS_IN_PIXELS_X = 800
+SIZE_OF_CANVAS_IN_PIXELS_Y = 800
+
+def get_objects_on_main_page(model):
+    """
+    Display a text of learning objects on main page.
+    """
+    return f"Main page: {model.mainPage}"
 
 def agent_portrayal(agent):
 
@@ -23,25 +35,26 @@ def agent_portrayal(agent):
         portrayal["r"] = 0.5
         portrayal["Layer"] = 0
         portrayal["Filled"] = "true"
-        color = "gray"
-        if agent.action == 0:
+        color = NONE_COLOR
+        if agent.action == 1:
             color = VIEW_COLOR
-        elif agent.action == 1:
-            color = DOWNLOAD_COLOR
         elif agent.action == 2:
-            color = LIKE_COLOR
+            color = DOWNLOAD_COLOR
         elif agent.action == 3:
+            color = LIKE_COLOR
+        elif agent.action == 4:
             color = RATE_COLOR
         portrayal["Color"] = color
     elif type(agent) is LearningObjectAgent:
-        if agent.isOnMainPage:
-            portrayal["Color"] = ["#84e184", "#adebad", "#d6f5d6"]
-            portrayal["Shape"] = "rect"
-            portrayal["Filled"] = "true"
-        portrayal["Layer"] = 0
+        portrayal["Layer"] = 1
         portrayal["w"] = 1
         portrayal["h"] = 1
         portrayal["Text"] = agent.text
+        '''    if agent.isOnMainPage:
+            portrayal["Color"] = ["#84e184", "#adebad", "#d6f5d6"]
+            portrayal["Shape"] = "rect"
+            portrayal["Filled"] = "true"'''
+        
     return portrayal
 
 # dictionary of user settable parameters - these map to the model __init__ parameters
@@ -133,9 +146,11 @@ model_params = {
         100,
         description="Like weight to be used to rank",
     ),
+    "width": NUMBER_OF_CELLS,
+    "height": NUMBER_OF_CELLS,
 }
 
-grid = mesa.visualization.CanvasGrid(agent_portrayal, 10, 10, 500, 500)
+grid = mesa.visualization.CanvasGrid(agent_portrayal, NUMBER_OF_CELLS, NUMBER_OF_CELLS, SIZE_OF_CANVAS_IN_PIXELS_X, SIZE_OF_CANVAS_IN_PIXELS_Y)
 
 # map data to chart in the ChartModule
 line_chart = mesa.visualization.ChartModule(
@@ -148,5 +163,5 @@ line_chart = mesa.visualization.ChartModule(
 )
 
 server = mesa.visualization.ModularServer(
-    RepositoryUsageModel, [grid, line_chart], "Repository Model",  model_params=model_params,
+    RepositoryUsageModel, [grid, get_objects_on_main_page, line_chart], "Repository Model",  model_params=model_params,
 )
