@@ -2,7 +2,7 @@ import mesa
 
 class LearningObjectAgent(mesa.Agent):
     """An learning object agent that takes action in repository."""
-    def __init__(self, unique_id, onMainPage, model):
+    def __init__(self, unique_id, on_main_page, model):
         super().__init__(unique_id, model)    
         self.views = 0
         self.downloads = 0
@@ -44,22 +44,20 @@ class UserAgent(mesa.Agent):
             print("Old action = " + str(self.action))
 
             prob_action = self.random.randrange(0,100)
-            if(self.action == 0):
+            if self.action == 0 or self.action == 4:
                 print("Main page = " + self.model.mainPage)
-                mainPageExp = 0
+                main_page_exp = 0
                 if((" " + str(self.unique_id) + " ") in self.model.mainPage):
-                    mainPageExp = 0.1
+                    main_page_exp = 0.1
                     print("*** LO on main page ***")
-                if(prob_action <= (self.model.view_chance + mainPageExp) * 100):
+                if(prob_action <= (self.model.view_chance + main_page_exp) * 100):
                     print(str(self.unique_id) + " - Viewed LO!")
                     self.action = 1
                     cellmates[0].views += 1
                 else:
                     print(str(self.unique_id) + " - NOT Viewed LO!")
                     self.canMove = True
-            #cellmates[0].color = self.number_to_string_color(action_number)
-            #print(cellmates[0].color)
-            elif(self.action == 1):
+            elif self.action == 1:
                 if(prob_action <= self.model.download_chance * 100):
                     print(str(self.unique_id) + " - Downloaded LO!")
                     self.action = 2
@@ -84,7 +82,7 @@ class UserAgent(mesa.Agent):
                 else:
                     print(str(self.unique_id) + " - NOT Rated LO!")
                     self.action = 0
-                    self.canMove = True
+                self.canMove = True
 
     def move(self):
         x = self.random.randrange(self.model.grid.width)
