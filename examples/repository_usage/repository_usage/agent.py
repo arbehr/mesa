@@ -12,10 +12,13 @@ class LearningObjectAgent(mesa.Agent):
         self.score = 0
 
     def step(self):
+        weights_sum = self.model.view_weight + self.model.download_weight + self.model.rate_weight + self.model.like_weight
+        self.score = (self.model.view_weight * self.views) + (self.model.download_weight * self.downloads)
+        self.score = self.score + (self.model.rate_weight * self.rates) + (self.model.like_weight * self.likes)
+        self.score = self.score / weights_sum
         self.text = "ID: " + str(self.unique_id) + ". V:" + str(self.views) 
         self.text += " D:" + str(self.downloads) + " R:" + str(self.rates) + " L:" + str(self.likes)
-        self.score = 0
-        # calc score
+        self.text += " SCORE:" + str(float("{:.4f}".format(self.score)))
 
 class UserAgent(mesa.Agent):
     """An user agent that takes action in repository."""

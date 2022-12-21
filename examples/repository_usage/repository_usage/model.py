@@ -46,6 +46,10 @@ class RepositoryUsageModel(mesa.Model):
         self.download_chance = download_chance
         self.like_chance = like_chance
         self.rate_chance = rate_chance
+        self.view_weight = view_weight
+        self.download_weight = download_weight
+        self.rate_weight = rate_weight
+        self.like_weight = like_weight
 
         # Create learning object agents, one in each cell, static
         id = 0
