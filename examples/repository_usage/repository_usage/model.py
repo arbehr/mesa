@@ -2,6 +2,7 @@ import mesa
 
 from .agent import UserAgent, LearningObjectAgent
 import numpy as np
+import networkx as nx
 
 def get_total_downloads(model):
     """sum of all agents' downloads"""
@@ -50,12 +51,16 @@ class RepositoryUsageModel(mesa.Model):
         self.download_weight = download_weight
         self.rate_weight = rate_weight
         self.like_weight = like_weight
+        self.G = nx.Graph()
+        
 
         # Create learning object agents, one in each cell, static
         id = 0
         for i in range(self.grid.width):
             for j in range(self.grid.height):
                 a = LearningObjectAgent(id, id < 5, self)
+                #to the networkgrid (grid2)
+                self.G.add_node(id)
                 id += 1
                 self.grid.place_agent(a, (i, j))
                 self.schedule.add(a)
@@ -66,7 +71,9 @@ class RepositoryUsageModel(mesa.Model):
             if((" " + str(random_id) + " ") not in self.mainPage):
                 pickedIds += 1
                 self.mainPage += str(random_id) + " "
-                
+        # Add edges for nodes
+        self.G.add_edges_from([(1,5),(1,3),(5,6),(20,50),(11,12)])     
+        self.G.add_edge(1, 2)    
         # Create user agents
         for i in range(self.num_agents):
             a = UserAgent(id, self)

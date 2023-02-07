@@ -23,6 +23,31 @@ def get_objects_on_main_page(model):
     """
     return f"Main page: {model.mainPage}"
 
+def network_portrayal(G):
+    # The model ensures there is 0 or 1 agent per node
+
+    portrayal = dict()
+    portrayal["nodes"] = [
+        {
+            "id": node_id,
+            "size": 3 if agents else 1,
+            "color": "#CC0000" if not agents or agents[0].wealth == 0 else "#007959",
+            "label": None
+            if not agents
+            else f"Agent:{agents[0].unique_id} Wealth:{agents[0].wealth}",
+        }
+        for (node_id, agents) in G.nodes.data("agent")
+    ]
+
+    portrayal["edges"] = [
+        {"id": edge_id, "source": source, "target": target, "color": "#000000"}
+        for edge_id, (source, target) in enumerate(G.edges)
+    ]
+    print(enumerate(G.edges))
+    return portrayal
+
+grid2 = mesa.visualization.NetworkModule(network_portrayal, 1500, 1500)
+
 def agent_portrayal(agent):
 
     if agent is None:
@@ -163,5 +188,5 @@ line_chart = mesa.visualization.ChartModule(
 )
 
 server = mesa.visualization.ModularServer(
-    RepositoryUsageModel, [grid, get_objects_on_main_page, line_chart], "Repository Model",  model_params=model_params,
+    RepositoryUsageModel, [grid, get_objects_on_main_page, line_chart, grid2], "Repository Model",  model_params=model_params,
 )
