@@ -1,5 +1,6 @@
 from repository_usage.model import *
 import mesa
+import matplotlib.pyplot as plt
 
 # The colors here are taken from Matplotlib's tab10 palette
 # Gray, action_code = 0
@@ -75,15 +76,19 @@ def agent_portrayal(agent):
         portrayal["w"] = 1
         portrayal["h"] = 1
         portrayal["Text"] = agent.text
-        '''    if agent.isOnMainPage:
+        if agent.isOnMainPage and agent.showMainPage:
             portrayal["Color"] = ["#84e184", "#adebad", "#d6f5d6"]
-            portrayal["Shape"] = "rect"
-            portrayal["Filled"] = "true"'''
+            portrayal["Shape"] = "circle"
+            portrayal["Filled"] = "true"
+            portrayal["Layer"] = 1
+            portrayal["r"] = 0.2
+        
         
     return portrayal
 
 # dictionary of user settable parameters - these map to the model __init__ parameters
 model_params = {
+    "showMainPage": mesa.visualization.Checkbox("Showcase Enabled", True),
     "sec_repository": mesa.visualization.StaticText("Repository Parameters:"),
     "max_steps": mesa.visualization.Slider(
         "Lifecycle (max steps)",

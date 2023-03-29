@@ -10,6 +10,8 @@ class LearningObjectAgent(mesa.Agent):
         self.likes = 0
         self.text = ""
         self.score = 0
+        self.isOnMainPage = on_main_page
+        self.showMainPage = model.showMainPage
 
     def step(self):
         weights_sum = self.model.view_weight + self.model.download_weight + self.model.rate_weight + self.model.like_weight
@@ -50,40 +52,40 @@ class UserAgent(mesa.Agent):
             if self.action == 0 or self.action == 4:
                 print("Main page = " + self.model.mainPage)
                 main_page_exp = 0
-                if((" " + str(self.unique_id) + " ") in self.model.mainPage):
+                if((" " + str(cellmates[0].unique_id) + " ") in self.model.mainPage):
                     main_page_exp = 0.1
                     print("*** LO on main page ***")
                 if(prob_action <= (self.model.view_chance + main_page_exp) * 100):
-                    print(str(self.unique_id) + " - Viewed LO!")
+                    print(str(self.unique_id) + " - Viewed LO! at " + str(cellmates[0].pos))
                     self.action = 1
                     cellmates[0].views += 1
                 else:
-                    print(str(self.unique_id) + " - NOT Viewed LO!")
+                    print(str(self.unique_id) + " - NOT Viewed LO! at " + str(cellmates[0].pos))
                     self.canMove = True
             elif self.action == 1:
                 if(prob_action <= self.model.download_chance * 100):
-                    print(str(self.unique_id) + " - Downloaded LO!")
+                    print(str(self.unique_id) + " - Downloaded LO! at " + str(cellmates[0].pos))
                     self.action = 2
                     cellmates[0].downloads += 1
                 else:
-                    print(str(self.unique_id) + " - NOT Downloaded LO!")
+                    print(str(self.unique_id) + " - NOT Downloaded LO! at " + str(cellmates[0].pos))
                     self.action = 0
                     self.canMove = True
             elif self.action == 2:
                 if(prob_action <= self.model.like_chance * 100):
-                    print(str(self.unique_id) + " - Liked LO!")
+                    print(str(self.unique_id) + " - Liked LO! at " + str(cellmates[0].pos))
                     cellmates[0].likes += 1
                     self.action = 3
                 else:
-                    print(str(self.unique_id) + " - NOT Liked LO! Let's try to rate")
+                    print(str(self.unique_id) + " - NOT Liked LO!  at " + str(cellmates[0].pos) + " Let's try to rate")
                     self.action = -3
             elif self.action == 3 or self.action == -3:
                 if(prob_action <= self.model.rate_chance * 100):
-                    print(str(self.unique_id) + " - Rated LO!")
+                    print(str(self.unique_id) + " - Rated LO!  at " + str(cellmates[0].pos))
                     cellmates[0].rates += 1
                     self.action = 4
                 else:
-                    print(str(self.unique_id) + " - NOT Rated LO!")
+                    print(str(self.unique_id) + " - NOT Rated LO! at " + str(cellmates[0].pos))
                     self.action = 0
                 self.canMove = True
 
