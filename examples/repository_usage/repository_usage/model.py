@@ -16,14 +16,8 @@ def get_total_views(model):
     """sum of all agents' views"""    
     agent_views = [a.views for a in model.schedule.agents if isinstance(a, LearningObjectAgent)]
     # return the sum of agents' views
-    print(np.sum(agent_views))
+    #print(np.sum(agent_views))
     return str(np.sum(agent_views))
-
-def get_total_rates(model):
-    """sum of all agents' rates"""
-    agent_rates = [a.rates for a in model.schedule.agents if isinstance(a, LearningObjectAgent)]
-    # return the sum of agents' rates
-    return str(np.sum(agent_rates))
 
 def get_total_likes(model):
     """sum of all agents' likes"""
@@ -37,14 +31,14 @@ class RepositoryUsageModel(mesa.Model):
         The agent color represent the action performed: download, view, rate, or like."""
 
     def __init__(self, init_users=10, view_weight=2, download_weight=4, rate_weight=8, like_weight=7, 
-        view_chance=0.6, download_chance=0.4, rate_chance=0.15, like_chance=0.2,
+        view_chance=0.6, download_chance=0.5, rate_chance=0.15, like_chance=0.3,
         max_steps=30, h_size=10, v_size=10, width=10, height=10, mainPageWidth=5, showMainPage=True):
         self.running = True
         self.num_agents = init_users
         self.grid = mesa.space.MultiGrid(width, height, True)
         self.schedule = mesa.time.RandomActivation(self)
         self.max_steps = max_steps
-        self.mainPage = " "
+        self.mainPage = []
         self.view_chance = view_chance
         self.download_chance = download_chance
         self.like_chance = like_chance
@@ -54,32 +48,28 @@ class RepositoryUsageModel(mesa.Model):
         self.rate_weight = rate_weight
         self.like_weight = like_weight
         self.showMainPage = showMainPage
-        self.G = nx.Graph()
-        
+        self.currentCycle = 0
 
         # Create learning object agents, one in each cell, static
         id = 0
         for i in range(self.grid.width):
             for j in range(self.grid.height):
                 a = LearningObjectAgent(id, False, self)
-                #to the networkgrid (grid2)
-                self.G.add_node(id)
                 id += 1
                 self.grid.place_agent(a, (i, j))
                 self.schedule.add(a)
-        # Get five random agents to put on main page and update attribute
+        # Get five random agents to put on main page in first time and update attribute
         pickedIds = 0
         while pickedIds < mainPageWidth:
             random_id = self.random.randrange(id)
-            if((" " + str(random_id) + " ") not in self.mainPage):
+            if(random_id not in self.mainPage):
                 pickedIds += 1
-                self.mainPage += str(random_id) + " "
+                self.mainPage.append(random_id)
                 a = self.schedule.agents.__getitem__(random_id)
                 a.isOnMainPage = True
+                a.cyclesOnMainPage.append(self.currentCycle)
 
-        # Add edges for nodes
-        self.G.add_edges_from([(1,5),(1,3),(5,6),(20,50),(11,12)])     
-        self.G.add_edge(1, 2)    
+          
         # Create user agents
         for i in range(self.num_agents):
             a = UserAgent(id, self)
@@ -96,7 +86,7 @@ class RepositoryUsageModel(mesa.Model):
             model_reporters={
                 "Views": get_total_views,
                 "Downloads": get_total_downloads,
-                "Rates": get_total_rates,
+                #"Rates": get_total_rates,
                 "Likes": get_total_likes,
             },
         )
@@ -109,41 +99,121 @@ class RepositoryUsageModel(mesa.Model):
         self.schedule.step()
         if(self.schedule.steps == self.max_steps):
             self.running = False
+            
+            
 
     def run_model(self):
         for i in range(self.run_time):
             self.step()
 
-"""A model with parameters setted in cosntructor and run it for 100 steps"""
+    def isSequential(self, size, list):
+        #print(list)
+        for i in range(0,size-1):
+            #print(list[-size+i] + 1)
+            #print(list[-size+i+1])
+            if(list[-size+i] + 1 != list[-size+i+1]):
+                return False
+        return True
 
-model = RepositoryUsageModel(init_users=30, width=10, height=10)
-for i in range(100):
-    model.step()
+    def checkSucessiveTimesOnMainPage(self, max, gain, type):
+        for cell in self.grid.coord_iter():
+            cell_content, x, y = cell
+            a = self.schedule.agents.__getitem__(cell_content[0].unique_id)
+            if((len(a.cyclesOnMainPage) >= max) and 
+               (self.isSequential(max, a.cyclesOnMainPage)) and
+               (a.cyclesOnMainPage[-1] == self.currentCycle)):
+                if(len(a.cyclesOnMainPage) > max and
+                (a.cyclesOnMainPage[-max-1] +1 == a.cyclesOnMainPage[-max])):
+                    print("LO = " + str(a.unique_id) + " já foi para " + type + ".")
+                    print(a.cyclesOnMainPage)
+                else:
+                    print("Muitas vezes seguidas escaparate! Vai para " + type + ", LO = " + str(a.unique_id))
+                    a.attractivity += gain
+                    print(a.cyclesOnMainPage)
 
+    def updateAttractivity(self):
+        for cell in self.grid.coord_iter():
+            cell_content, x, y = cell
+            a = self.schedule.agents.__getitem__(cell_content[0].unique_id)
+            if(a.downloads - a.lastCycleDownloads >= 10):
+                a.attractivity += 0.2
+                print("Attractivity updated by download. LO = " + str(a.unique_id) + " with delta = " + str(a.downloads - a.lastCycleDownloads))
+            if(a.likes - a.lastCycleLikes >= 5):
+                a.attractivity += 0.2
+                print("Attractivity updated by like. LO = " + str(a.unique_id) + " with delta = " + str(a.likes - a.lastCycleLikes))
+
+    def updateMainPageLikeDownloads(self):
+        d = {}
+        for cell in self.grid.coord_iter():
+            cell_content, x, y = cell
+            a = self.schedule.agents.__getitem__(cell_content[0].unique_id)
+            d[cell_content[0].unique_id] = a.score
+            a.lastCycleLikes = a.likes
+            a.lastCycleDownloads = a.downloads
+            #print(d)
+        sorted_dict = dict(sorted(d.items(), key=lambda x:x[1]))
+        #print(sorted_dict)
+        print("Scores:")
+        print("First One: " + str(list(sorted_dict.values())[0]) + " LO = " + str(list(sorted_dict.keys())[0]))
+        print("Last One: " + str(list(sorted_dict.values())[-1]) + " LO = " + str(list(sorted_dict.keys())[-1]))
+        five_first = 0
+        self.mainPage = []
+        for key in sorted_dict.keys():
+            self.mainPage.append(key)
+            a = self.schedule.agents.__getitem__(key)
+            a.cyclesOnMainPage.append(model.currentCycle)
+            five_first += 1
+            #print(sorted_dict)
+            if(five_first == 5):
+                break
+
+"""A model with parameters setted in cosntructor and run in cycles for 100 steps"""
+cycles = 100
+model = RepositoryUsageModel(init_users=10, width=10, height=10)
+
+for j in range(cycles):
+    print(">>>>> Starting cycle #" + str(j))
+    if (j > 0):
+        model.updateMainPageLikeDownloads() 
+        print("New main page:")
+    else:
+        print("Old main page:")
+
+    print(sorted(model.mainPage))
+    
+    for i in range(100):
+        model.step()
+    
+
+    model.updateAttractivity()
+    model.checkSucessiveTimesOnMainPage(4, 0.1, "redes sociais")
+    model.checkSucessiveTimesOnMainPage(8, 0.3, "refatoração")
+    model.currentCycle += 1
+    
 
 scores = np.zeros((model.grid.width, model.grid.height))
 views = np.zeros((model.grid.width, model.grid.height))
 downloads = np.zeros((model.grid.width, model.grid.height))
 likes = np.zeros((model.grid.width, model.grid.height))
-rates = np.zeros((model.grid.width, model.grid.height))
+#rates = np.zeros((model.grid.width, model.grid.height))
 
 for cell in model.grid.coord_iter():
     cell_content, x, y = cell
-    a = model.schedule.agents.__getitem__(x+y)
+    a = model.schedule.agents.__getitem__(cell_content[0].unique_id)
     scores[x][y] = a.score
     views[x][y] = a.views
     downloads[x][y] = a.downloads
     likes[x][y] = a.likes
-    rates[x][y] = a.rates
+    #rates[x][y] = a.rates
 
 #print(scores)
 
-con = np.concatenate((rates,likes,downloads,views))
-name = ['Rates', 'Likes', 'Downloads', 'Views']
+con = np.concatenate((likes,downloads,views))
+name = ['Likes', 'Downloads', 'Views']
 #magnitude = np.linalg.norm(con)
 #normalized_con = con / magnitude
 
-newarr = np.array_split(con, 4)
+newarr = np.array_split(con, 3)
 min_attr = np.min([np.min(con)])
 max_attr = np.max([np.max(con)])
 
@@ -153,7 +223,7 @@ min_score = np.min([np.min(scores)])
 fig = plt.figure(constrained_layout=True)
 (subfig_l, subfig_r) = fig.subfigures(nrows=1, ncols=2)
 
-axes_l = subfig_l.subplots(nrows=2, ncols=2, sharex=True, sharey=True)
+axes_l = subfig_l.subplots(nrows=1, ncols=3, sharex=True, sharey=True)
 for i,ax in enumerate(axes_l.flat):
     im = ax.imshow(newarr[i], interpolation='nearest', vmin=min_attr, vmax=max_attr)
     ax.set_title(name[i])
