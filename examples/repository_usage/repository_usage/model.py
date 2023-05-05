@@ -2,10 +2,11 @@ import mesa
 
 from .agent import UserAgent, LearningObjectAgent
 import numpy as np
-import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
+import csv
+import time
 
 def get_total_downloads(model):
     """sum of all agents' downloads"""
@@ -32,7 +33,7 @@ class RepositoryUsageModel(mesa.Model):
         The agent color represent the action performed: download, view, rate, or like."""
 
     def __init__(self, init_users=10, view_weight=2, download_weight=4, rate_weight=8, like_weight=7, 
-        view_chance=0.6, download_chance=0.5, rate_chance=0.15, like_chance=0.3,
+        download_chance=0.5, select_chance=0.7, like_chance=0.5,
         max_steps=30, h_size=10, v_size=10, width=10, height=10, mainPageWidth=5, showMainPage=True):
         self.running = True
         self.num_agents = init_users
@@ -40,58 +41,46 @@ class RepositoryUsageModel(mesa.Model):
         self.schedule = mesa.time.RandomActivation(self)
         self.max_steps = max_steps
         self.mainPage = []
-        self.oldMainPage = []
-        self.view_chance = view_chance
+        self.select_chance = select_chance
         self.download_chance = download_chance
         self.like_chance = like_chance
-        self.rate_chance = rate_chance
         self.view_weight = view_weight
         self.download_weight = download_weight
         self.rate_weight = rate_weight
         self.like_weight = like_weight
         self.showMainPage = showMainPage
         self.currentCycle = 0
-        self.weights = []
-        self.weightMainPageGain = 0.15 * (self.grid.width * self.grid.height)
-        self.weightSocialNetGain = 0.35 * (self.grid.width * self.grid.height)
-        self.weightRefactored = 0.7 * (self.grid.width * self.grid.height)
+        self.attractivities = []
         self.deltaScores = []
+        self.scenario = "HARD" #EASY, MEDIUM, HARD
+        self.dataToCSV = []
+
+        # Parameters to analyse
+        self.gainOnMainPage = 0.2
+        self.gainOnSocialMedia = 0.2
 
         # Create learning object agents, one in each cell, static
-        id = 0
+        object_id = 0
         for i in range(self.grid.width):
             for j in range(self.grid.height):
-                a = LearningObjectAgent(id, False, self)
-                id += 1
+                a = LearningObjectAgent(object_id, False, self)
+                object_id += 1
                 self.grid.place_agent(a, (i, j))
                 self.schedule.add(a)
-        
-        # Weights of each learning object be picked up
-        self.weights = np.ones((self.grid.width * self.grid.height))
-        
-        # Get five random agents to put on main page in first time and update attribute
-        pickedIds = 0
-        while pickedIds < mainPageWidth:
-            random_id = self.random.randrange(id)
-            if(random_id not in self.mainPage):
-                pickedIds += 1
-                self.mainPage.append(random_id)
-                a = self.schedule.agents.__getitem__(random_id)
-                a.isOnMainPage = True
-                a.cyclesOnMainPage.append(self.currentCycle)
-                x, y = a.pos
-                self.weights[random_id] += self.weightMainPageGain
-          
+                self.attractivities.append(a.attractivity)
+                       
         # Create user agents
         for i in range(self.num_agents):
-            a = UserAgent(id, self)
-            id += 1
+            a = UserAgent(object_id, self)
+            object_id += 1
             self.schedule.add(a)
-
+           
             # Add the agent to a random grid cell
             x = self.random.randrange(self.grid.width)
             y = self.random.randrange(self.grid.height)
             self.grid.place_agent(a, (x, y))
+            # Then move to a proper learning object with more attractivity
+            a.move()
 
         # see datacollector functions above
         self.datacollector = mesa.DataCollector(
@@ -132,7 +121,7 @@ class RepositoryUsageModel(mesa.Model):
             cell_content, x, y = cell
             a = self.schedule.agents.__getitem__(cell_content[0].unique_id)
             if((len(a.cyclesOnMainPage) >= max) and 
-               (self.isSequential(max, a.cyclesOnMainPage)) and
+               #(self.isSequential(max, a.cyclesOnMainPage)) and
                (a.cyclesOnMainPage[-1] == self.currentCycle)):
                 if(len(a.cyclesOnMainPage) > max and
                 (a.cyclesOnMainPage[-max-1] +1 == a.cyclesOnMainPage[-max])):
@@ -141,54 +130,44 @@ class RepositoryUsageModel(mesa.Model):
                 else:
                     print("Muitas vezes seguidas escaparate! Vai para " + type + ", LO = " + str(a.unique_id))
                     #print("Atratividade antes:")
-                    if(a.attractivity <= 0.65):
-                        a.attractivity = float(a.attractivity) + float(gain)
-                    print(a.attractivity)
+                    #if(a.attractivity <= 0.65):
+                    #    a.attractivity = float(a.attractivity) + float(gain)
+                    #print(a.attractivity)
                     #print(self.weights[cell_content[0].unique_id])
                     if(type == "redes sociais"):
-                        a.isOnSocialNetwork = True
-                        self.weights[cell_content[0].unique_id] += self.weightSocialNetGain
+                        a.socialNetwork += self.gainOnSocialMedia
+                        #self.weights[cell_content[0].unique_id] += self.weightSocialNetGain
                     if(type == "refatoração"):
-                        #a.isOnMainPage = False
-                        self.weights[cell_content[0].unique_id] += self.weightRefactored
-
-
-    #updateProbabilities(self):
-    #scores = np.zeros((model.grid.width, model.grid.height))
-
-    def updateAttractivity(self):
+                        #a.mainPage = 0
+                        a.cyclesOnMainPage = []
+                        #a.refactored = 0.
+                        a.refactored = round(self.random.uniform(-0.2, 0.3),3)
+                        #print("REFATORADO = " + str(a.refactored))
+                        #self.weights[cell_content[0].unique_id] += self.weightRefactored
+    
+    def updateAttractivities(self):
+        self.attractivities = []
         for cell in self.grid.coord_iter():
             cell_content, x, y = cell
             a = self.schedule.agents.__getitem__(cell_content[0].unique_id)
-            if(a.attractivity >= 0.7):
-                continue
-            if(a.downloads - a.lastCycleDownloads >= 10):
-                #print("Antigo ATTR = " + str(a.attractivity))
-                a.attractivity = round(float(a.attractivity) + float(0.1),2)
-                print("Attractivity updated by download. LO = " + str(a.unique_id) + " with delta = " + str(a.downloads - a.lastCycleDownloads) + " ATTR = " + str(a.attractivity))
-            if(a.likes - a.lastCycleLikes >= 5):
-                #print("Antigo ATTR = " + str(a.attractivity))
-                a.attractivity = round(float(a.attractivity) + float(0.2),2)
-                print("Attractivity updated by like. LO = " + str(a.unique_id) + " with delta = " + str(a.likes - a.lastCycleLikes) + " ATTR = " + str(a.attractivity))
-
-    def updateMainPageLikeDownloads(self):
-        self.oldMainPage = self.oldMainPage.copy()
+            a.attractivity = a.intrinsicValue + a.mainPage + a.socialNetwork + a.refactored
+            self.attractivities.append(a.attractivity)  
+    
+    def updateMainPage(self):
         d = {}
         for cell in self.grid.coord_iter():
             cell_content, x, y = cell
             a = self.schedule.agents.__getitem__(cell_content[0].unique_id)
+            a.mainPage = 0
+            a.gainOnMainPage = 0
             d[cell_content[0].unique_id] = a.score
-            a.lastCycleLikes = a.likes
-            a.lastCycleDownloads = a.downloads
-            if(a.isOnMainPage):
-                self.weights[cell_content[0].unique_id] -= self.weightMainPageGain
-            #elif(not a.isOnSocialNetwork):
-            #    self.weights[cell_content[0].unique_id] = 1
-            a.isOnMainPage = False
-            #print(d)
+            
         sorted_dict = dict(sorted(d.items(), key=lambda x:x[1]))
         #print(sorted_dict)
         print("Scores:")
+        self.dataToCSV.append(str(list(sorted_dict.values())[0]))
+        self.dataToCSV.append(str(list(sorted_dict.values())[-1]))
+        self.dataToCSV.append(str(list(sorted_dict.values())[-1] - list(sorted_dict.values())[0]))
         print("First One: " + str(list(sorted_dict.values())[0]) + " LO = " + str(list(sorted_dict.keys())[0]) + " ATTR = " + str(self.schedule.agents.__getitem__(list(sorted_dict.keys())[0]).attractivity))
         print("Last One: " + str(list(sorted_dict.values())[-1]) + " LO = " + str(list(sorted_dict.keys())[-1]) + " ATTR = " + str(self.schedule.agents.__getitem__(list(sorted_dict.keys())[-1]).attractivity))
         print("Delta: " + str(list(sorted_dict.values())[-1] - list(sorted_dict.values())[0]))
@@ -199,54 +178,65 @@ class RepositoryUsageModel(mesa.Model):
         for key in sorted_dict.keys():
             self.mainPage.append(key)
             a = self.schedule.agents.__getitem__(key)
-            a.isOnMainPage = True
-            #if(len(a.cyclesOnMainPage) == 0 or 
-            #   (len(a.cyclesOnMainPage) > 0 and a.cyclesOnMainPage[-1] + 1 != model.currentCycle)):
-            #    x, y = a.pos
-                #print("X = " + str(x) + " Y = " + str(y))
-            self.weights[key] += self.weightMainPageGain
-            if(key in self.oldMainPage):
-                self.weights[key] += self.weightMainPageGain
-                #print(self.probabilities)
             a.cyclesOnMainPage.append(model.currentCycle)
+            a.mainPage += self.gainOnMainPage
             five_first += 1
             #print(sorted_dict)
             if(five_first == 5):
                 break
 
-"""A model with parameters setted in cosntructor and run in cycles for 100 steps"""
-cycles = 300
+"""A model with parameters setted in cosntructor and run in cycles for 100 steps (ticks)"""
+cycles = 30
+ticks = 100
+ts = time.time()
 model = RepositoryUsageModel(init_users=10, width=10, height=10)
 
-for j in range(cycles):
-    print(">>>>> Starting cycle #" + str(j))
-    if (j > 0):
-        # Weights of each learning object be picked up
-        model.updateMainPageLikeDownloads() 
-        print("New main page:")
-        
-    else:
-        print("Old main page:")
-        
+header = ['cycle', 'ticks', 'first_score', 'last_score', 'delta_score',
+          'main_page', 'gainMainpage', 'gainSocialNetwork', 'gainRefactored',],
 
-    print(sorted(model.mainPage))
-    #print(model.weights)
-    
-    for i in range(100):
-        model.step()
-    
+with open('experiments' + str(ts) + '.csv', 'w+', encoding='UTF8', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(header)
+    for j in range(cycles):
+        model.dataToCSV = []
+        model.dataToCSV.append(str(j))
+        model.dataToCSV.append(ticks)
 
-    model.updateAttractivity()
-    model.checkSucessiveTimesOnMainPage(4, 0.2, "redes sociais")
-    model.checkSucessiveTimesOnMainPage(8, 0.3, "refatoração")
-    model.currentCycle += 1
-#print(model.weights)    
+        print(">>>>> Starting cycle #" + str(j))
+           
+        for i in range(ticks):
+            model.step()
+        
+        #Decisions after cycle
+        if (j > 0):
+            model.updateMainPage() 
+            print("New main page:")
+            print(sorted(model.mainPage))
+        else:
+            model.dataToCSV.append("0")
+            model.dataToCSV.append("0")
+            model.dataToCSV.append("0")
+        
+        model.dataToCSV.append(str(sorted(model.mainPage)))
+        model.dataToCSV.append(str(model.gainOnMainPage))
+        model.dataToCSV.append(str(model.gainOnSocialMedia))
+        model.dataToCSV.append("0")
+       
+        if(model.scenario == "HARD" or model.scenario == "MEDIUM"):
+            model.checkSucessiveTimesOnMainPage(4, 0.5, "redes sociais")
+        if(model.scenario == "HARD"):
+            model.checkSucessiveTimesOnMainPage(8, 0.0, "refatoração")
+        model.updateAttractivities()
+        model.currentCycle += 1
+
+        
+        writer.writerow(model.dataToCSV)
+#print(model.attractivities)    
 
 scores = np.zeros((model.grid.width, model.grid.height))
 views = np.zeros((model.grid.width, model.grid.height))
 downloads = np.zeros((model.grid.width, model.grid.height))
 likes = np.zeros((model.grid.width, model.grid.height))
-#rates = np.zeros((model.grid.width, model.grid.height))
 
 for cell in model.grid.coord_iter():
     cell_content, x, y = cell
@@ -307,4 +297,3 @@ sns.histplot(data=model.deltaScores)
 plt.title("Histograma de delta escores")
 plt.grid()
 plt.show()
-print(model.detaScores)

@@ -7,21 +7,19 @@ class LearningObjectAgent(mesa.Agent):
         super().__init__(unique_id, model)    
         self.views = 0
         self.downloads = 0
-        self.lastCycleDownloads = 0
+        self.downloadsCount = 0
         self.likes = 0
-        self.lastCycleLikes = 0
+        self.likesCount = 0
         self.text = ""
         self.score = 0
         self.cyclesOnMainPage = []
-        self.isOnMainPage = on_main_page
         self.showMainPage = model.showMainPage
-        self.isOnSocialNetwork = False
-        self.attractivity = float(round(self.random.random(),2))
-        if(self.attractivity == 1.0):
-            self.attractivity = 0.9
-        if (self.attractivity < 0.1):
-            self.attractivity = 0.1
-
+        self.intrinsicValue = round(self.random.uniform(0.1, 0.4),3)
+        self.socialNetwork = 0
+        self.mainPage = 0
+        self.refactored = 0
+        self.attractivity = self.intrinsicValue + self.mainPage + self.socialNetwork + self.refactored
+        
     def step(self):
         weights_sum = self.model.view_weight + self.model.download_weight + self.model.like_weight #+ self.model.rate_weight 
         self.score = (self.model.view_weight * self.views) + (self.model.download_weight * self.downloads)
@@ -58,16 +56,15 @@ class UserAgent(mesa.Agent):
         if isinstance(cellmates[0], LearningObjectAgent):
             #print("Old action = " + str(self.action))
 
-            prob_user_interest = round(self.random.random(),2)
+            action_probability = round(self.random.random(),2)
             
-            if self.action == 0 :
+            if self.action == 0:
                 #print("Main page = " + self.model.mainPage)
                 main_page_exp = 0
                 if((" " + str(cellmates[0].unique_id) + " ") in self.model.mainPage):
                     main_page_exp = 0.3
                     #print("*** LO on main page ***")
-                if(float(prob_user_interest + cellmates[0].attractivity + main_page_exp) >= 1.0):
-                #if(float(prob_user_interest + main_page_exp) >= cellmates[0].attractivity):
+                if(action_probability <= (self.model.select_chance + main_page_exp)):
                     #print("User: " + str(self.unique_id) + " - Viewed LO(" + str(cellmates[0].unique_id) + ")! at " + str(cellmates[0].pos))
                     #print(str(cellmates[0].unique_id) + ": " + str(prob_user_interest) + " - " + str(cellmates[0].attractivity))
                     self.action = 1
@@ -76,41 +73,33 @@ class UserAgent(mesa.Agent):
                     #print("User: " + str(self.unique_id) + " - NOT Viewed LO(" + str(cellmates[0].unique_id) + ")! at " + str(cellmates[0].pos))
                     self.canMove = True
             elif self.action == 1:
-                #if(prob_user_interest + (cellmates[0].attractivity * self.model.download_chance) >= 1):
-                if(prob_user_interest >= (cellmates[0].attractivity * self.model.download_chance)):
+                if(action_probability <= self.model.download_chance):
                     #print("User: " + str(self.unique_id) + " - Downloaded LO(" + str(cellmates[0].unique_id) + ")! at " + str(cellmates[0].pos))
                     self.action = 2
                     cellmates[0].downloads += 1
+                    #cellmates[0].downloadsCount += 1
+                    if(cellmates[0].downloadsCount == 5):
+                        cellmates[0].downloadsCount = 0
+                        #cellmates[0].intrinsicValue += 0.2
+                        #print("LO = " + str(cellmates[0].unique_id) + " Attractivity updated by download.")
                 else:
                     #print("User: " + str(self.unique_id) + " - NOT Downloaded LO(" + str(cellmates[0].unique_id) + ")! at " + str(cellmates[0].pos))
                     self.action = 0
                     self.canMove = True
             elif self.action == 2:
-                #if(prob_user_interest + (cellmates[0].attractivity * self.model.like_chance) >= 1):
-                if(prob_user_interest >= (cellmates[0].attractivity * self.model.like_chance)):
+                if(action_probability <= self.model.like_chance):
                     #print("User: " + str(self.unique_id) + " - Liked LO(" + str(cellmates[0].unique_id) + ")! at " + str(cellmates[0].pos))
                     cellmates[0].likes += 1
-                    #self.action = 3
-                #else:
-                    #print("User: " + str(self.unique_id) + " - NOT Liked LO(" + str(cellmates[0].unique_id) + ")!  at " + str(cellmates[0].pos)) #+ " Let's try to rate")
-                    #self.action = -3
+                    cellmates[0].likesCount += 1
+                    if(cellmates[0].likesCount == 2):
+                        cellmates[0].likesCount = 0
+                        #cellmates[0].intrinsicValue += 0.2
+                        #print("LO = " + str(cellmates[0].unique_id) + " Attractivity updated by like.")
                 self.canMove = True
                 self.action = 0
-            '''elif self.action == 3 or self.action == -3:
-                if(prob_user_interest <= self.model.rate_chance * 100):
-                    print(str(self.unique_id) + " - Rated LO!  at " + str(cellmates[0].pos))
-                    cellmates[0].rates += 1
-                    self.action = 4
-                else:
-                    print(str(self.unique_id) + " - NOT Rated LO! at " + str(cellmates[0].pos))
-                    self.action = 0
-                self.canMove = True
-                '''
 
     def move(self):
-        #x = self.random.randrange(self.model.grid.width)
-        #y = self.random.randrange(self.model.grid.height)
-        probabilities = [weight/sum(self.model.weights) for weight in self.model.weights]
+        probabilities = [attractivity/sum(self.model.attractivities) for attractivity in self.model.attractivities]
         position = np.random.choice(np.arange(0, 100), p = probabilities)
         a = self.model.schedule.agents.__getitem__(position)
         x , y = a.pos
