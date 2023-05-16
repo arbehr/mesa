@@ -33,7 +33,7 @@ class RepositoryUsageModel(mesa.Model):
         The agent color represent the action performed: download, view, rate, or like."""
 
     def __init__(self, init_users=10, view_weight=2, download_weight=4, rate_weight=8, like_weight=7, 
-        download_chance=0.5, select_chance=0.7, like_chance=0.5,
+        download_chance=0.5, like_chance=0.5,
         max_steps=30, h_size=10, v_size=10, width=10, height=10, mainPageWidth=5, showMainPage=True):
         self.running = True
         self.num_agents = init_users
@@ -41,7 +41,6 @@ class RepositoryUsageModel(mesa.Model):
         self.schedule = mesa.time.RandomActivation(self)
         self.max_steps = max_steps
         self.mainPage = []
-        self.select_chance = select_chance
         self.download_chance = download_chance
         self.like_chance = like_chance
         self.view_weight = view_weight
@@ -51,13 +50,27 @@ class RepositoryUsageModel(mesa.Model):
         self.showMainPage = showMainPage
         self.currentCycle = 0
         self.attractivities = []
+        self.newScores = np.zeros((width, height))
+        self.lastScores = np.zeros((width, height))
+        self.diffScores = []
+        self.scenario = "NULL" #EASY, MEDIUM, HARD, NULL
+        self.decisionType = "HEAVY" #SOFT, HEAVY
+        #self.dataToCSV = []
         self.deltaScores = []
-        self.scenario = "HARD" #EASY, MEDIUM, HARD
-        self.dataToCSV = []
 
         # Parameters to analyse
-        self.gainOnMainPage = 0.2
-        self.gainOnSocialMedia = 0.2
+        if(self.scenario == "EASY"):
+            self.gainOnMainPage = 0.2
+            self.gainOnSocialMedia = 0.2
+        if(self.scenario == "MEDIUM"):
+            self.gainOnMainPage = 0.1
+            self.gainOnSocialMedia = 0.1
+        if(self.scenario == "HARD"):
+            self.gainOnMainPage = 0.05
+            self.gainOnSocialMedia = 0.05
+        if(self.scenario == "NULL"):
+            self.gainOnMainPage = 0
+            self.gainOnSocialMedia = 0
 
         # Create learning object agents, one in each cell, static
         object_id = 0
@@ -101,17 +114,12 @@ class RepositoryUsageModel(mesa.Model):
         if(self.schedule.steps == self.max_steps):
             self.running = False
             
-            
-
     def run_model(self):
         for i in range(self.run_time):
             self.step()
 
     def isSequential(self, size, list):
-        #print(list)
         for i in range(0,size-1):
-            #print(list[-size+i] + 1)
-            #print(list[-size+i+1])
             if(list[-size+i] + 1 != list[-size+i+1]):
                 return False
         return True
@@ -141,7 +149,10 @@ class RepositoryUsageModel(mesa.Model):
                         #a.mainPage = 0
                         a.cyclesOnMainPage = []
                         #a.refactored = 0.
-                        a.refactored = round(self.random.uniform(-0.2, 0.3),3)
+                        if(self.scenario == "EASY"):
+                            a.intrinsicValue = round(self.random.uniform(-0.2, 0.2),2)
+                        if(self.scenario == "MEDIUM"):
+                            a.intrinsicValue = round(self.random.uniform(-0.1, 0.1),2)
                         #print("REFATORADO = " + str(a.refactored))
                         #self.weights[cell_content[0].unique_id] += self.weightRefactored
     
@@ -150,7 +161,17 @@ class RepositoryUsageModel(mesa.Model):
         for cell in self.grid.coord_iter():
             cell_content, x, y = cell
             a = self.schedule.agents.__getitem__(cell_content[0].unique_id)
-            a.attractivity = a.intrinsicValue + a.mainPage + a.socialNetwork + a.refactored
+            if(a.downloadsInCycle > 5):
+                a.intrinsicValue += 0.1
+            if(a.likesInCycle > 5):
+                a.intrinsicValue += 0.1
+            if(a.downloadsInCycle == 0):
+                a.intrinsicValue -= 0.01
+            if(a.likesInCycle == 0):
+                a.intrinsicValue -= 0.01
+            if(a.intrinsicValue < 0.01):
+                a.intrinsicValue = 0.01
+            a.attractivity = a.intrinsicValue + a.mainPage + a.socialNetwork
             self.attractivities.append(a.attractivity)  
     
     def updateMainPage(self):
@@ -161,17 +182,18 @@ class RepositoryUsageModel(mesa.Model):
             a.mainPage = 0
             a.gainOnMainPage = 0
             d[cell_content[0].unique_id] = a.score
+            self.newScores[x][y] = a.score
             
         sorted_dict = dict(sorted(d.items(), key=lambda x:x[1]))
         #print(sorted_dict)
         print("Scores:")
-        self.dataToCSV.append(str(list(sorted_dict.values())[0]))
-        self.dataToCSV.append(str(list(sorted_dict.values())[-1]))
-        self.dataToCSV.append(str(list(sorted_dict.values())[-1] - list(sorted_dict.values())[0]))
+        #self.dataToCSV.append(str(list(sorted_dict.values())[0]))
+        #self.dataToCSV.append(str(list(sorted_dict.values())[-1]))
+        #self.dataToCSV.append(str(list(sorted_dict.values())[-1] - list(sorted_dict.values())[0]))
         print("First One: " + str(list(sorted_dict.values())[0]) + " LO = " + str(list(sorted_dict.keys())[0]) + " ATTR = " + str(self.schedule.agents.__getitem__(list(sorted_dict.keys())[0]).attractivity))
         print("Last One: " + str(list(sorted_dict.values())[-1]) + " LO = " + str(list(sorted_dict.keys())[-1]) + " ATTR = " + str(self.schedule.agents.__getitem__(list(sorted_dict.keys())[-1]).attractivity))
-        print("Delta: " + str(list(sorted_dict.values())[-1] - list(sorted_dict.values())[0]))
-        self.deltaScores.append(list(sorted_dict.values())[-1] - list(sorted_dict.values())[0])
+        #print("Delta: " + str(list(sorted_dict.values())[-1] - list(sorted_dict.values())[0]))
+        #self.deltaScores.append(list(sorted_dict.values())[-1] - list(sorted_dict.values())[0])
         five_first = 0
         self.mainPage = []
         #print(sorted_dict)
@@ -186,24 +208,21 @@ class RepositoryUsageModel(mesa.Model):
                 break
 
 """A model with parameters setted in cosntructor and run in cycles for 100 steps (ticks)"""
-cycles = 30
+cycles = 500
 ticks = 100
 ts = time.time()
 model = RepositoryUsageModel(init_users=10, width=10, height=10)
-
-header = ['cycle', 'ticks', 'first_score', 'last_score', 'delta_score',
-          'main_page', 'gainMainpage', 'gainSocialNetwork', 'gainRefactored',],
-
-with open('experiments' + str(ts) + '.csv', 'w+', encoding='UTF8', newline='') as f:
+header = ['cycle', 'delta_score-' + model.decisionType + '-' + model.scenario]
+with open('experiments-' + str(ts) + '-' + model.decisionType + '-' + model.scenario + '.csv', 'w+', encoding='UTF8', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(header)
     for j in range(cycles):
         model.dataToCSV = []
         model.dataToCSV.append(str(j))
-        model.dataToCSV.append(ticks)
-
+        #model.dataToCSV.append(ticks)
+        model.lastScores = model.newScores.copy()
         print(">>>>> Starting cycle #" + str(j))
-           
+            
         for i in range(ticks):
             model.step()
         
@@ -212,25 +231,47 @@ with open('experiments' + str(ts) + '.csv', 'w+', encoding='UTF8', newline='') a
             model.updateMainPage() 
             print("New main page:")
             print(sorted(model.mainPage))
-        else:
-            model.dataToCSV.append("0")
-            model.dataToCSV.append("0")
-            model.dataToCSV.append("0")
+            
+        #else:
+            #model.dataToCSV.append("0")
+            #model.dataToCSV.append("0")
+            #model.dataToCSV.append("0")
         
-        model.dataToCSV.append(str(sorted(model.mainPage)))
-        model.dataToCSV.append(str(model.gainOnMainPage))
-        model.dataToCSV.append(str(model.gainOnSocialMedia))
-        model.dataToCSV.append("0")
-       
-        if(model.scenario == "HARD" or model.scenario == "MEDIUM"):
+
+        diffScores = np.subtract(model.newScores,model.lastScores)
+        model.diffScores.append(np. reshape(diffScores,-1))
+        model.deltaScores.append(np.max(diffScores) - np.min(diffScores))
+        model.dataToCSV.append(np.max(diffScores) - np.min(diffScores))
+        writer.writerow(model.dataToCSV)
+        #model.dataToCSV.append(str(model.gainOnMainPage))
+        #model.dataToCSV.append(str(model.gainOnSocialMedia))
+        #model.dataToCSV.append("0")
+        
+        if(model.decisionType == "SOFT"):
             model.checkSucessiveTimesOnMainPage(4, 0.5, "redes sociais")
-        if(model.scenario == "HARD"):
             model.checkSucessiveTimesOnMainPage(8, 0.0, "refatoração")
+        if(model.decisionType == "HEAVY"):
+            model.checkSucessiveTimesOnMainPage(4, 0.5, "redes sociais")
+            model.checkSucessiveTimesOnMainPage(4, 0.0, "refatoração")
+        #if(model.scenario == "HARD"):
         model.updateAttractivities()
         model.currentCycle += 1
 
-        
-        writer.writerow(model.dataToCSV)
+header = ['#LO', 'last_score-' + model.decisionType + '-' + model.scenario]
+
+with open('experiments-' + model.decisionType + '-' + model.scenario + '.csv', 'w+', encoding='UTF8', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(header)
+
+    for cell in model.grid.coord_iter():
+        dataToCSV = []
+        cell_content, x, y = cell
+        a = model.schedule.agents.__getitem__(cell_content[0].unique_id)
+        dataToCSV.append(cell_content[0].unique_id)
+        dataToCSV.append(a.score)
+        writer.writerow(dataToCSV)
+
+    #writer.writerow(model.dataToCSV)
 #print(model.attractivities)    
 
 scores = np.zeros((model.grid.width, model.grid.height))
@@ -279,7 +320,7 @@ subfig_c1.colorbar(im, ax=axes_c1)
 
 axes_c2 = subfig_c2.subplots(nrows=1, ncols=1)
 
-x_axis = [i for i in range(0,cycles-1)]
+x_axis = [i for i in range(0,cycles)]
 y_axis = model.deltaScores
 
 axes_c2.plot(x_axis, y_axis)
@@ -292,6 +333,17 @@ axes_r.hist(x)
 #subfig_r.ylabel('Delta score')
 
 plt.show()
+
+plt.plot(x_axis, y_axis)
+plt.show()
+
+chuncks = [i*50 for i in range(0,int(cycles/50) + 1)]
+print(chuncks)
+for i in range(len(chuncks)-1):
+    bp_x_axis = [y for y in range(chuncks[i],chuncks[i+1])]
+    plt.boxplot(model.diffScores[chuncks[i]:chuncks[i+1]], positions=bp_x_axis)
+    # show plot
+    plt.show()
 
 sns.histplot(data=model.deltaScores)
 plt.title("Histograma de delta escores")

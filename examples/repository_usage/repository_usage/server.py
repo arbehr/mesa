@@ -51,7 +51,7 @@ def agent_portrayal(agent):
         portrayal["w"] = 1
         portrayal["h"] = 1
         portrayal["Text"] = agent.text
-        if agent.mainPage and agent.showMainPage:
+        if agent.mainPage:
             portrayal["Color"] = ["#84e184", "#adebad", "#d6f5d6"]
             portrayal["Shape"] = "circle"
             portrayal["Filled"] = "true"
@@ -85,14 +85,6 @@ model_params = {
         1,
         100,
         description="Vertical size of learning objects",
-    ),
-    "select_chance": mesa.visualization.Slider(
-        "Selection Chance",
-        0.7,
-        0.0,
-        1.0,
-        0.1,
-        description="Probability that a learning object will be selected",
     ),
     "download_chance": mesa.visualization.Slider(
         "Download Chance",
